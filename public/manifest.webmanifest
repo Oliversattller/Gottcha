@@ -1,0 +1,10 @@
+{
+  "name": "Gotcha Live – IRL Hide & Seek",
+  "short_name": "Gotcha Live",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#171a22",
+  "theme_color": "#171a22",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

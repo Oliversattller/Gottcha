@@ -14,7 +14,7 @@ const getToken = () => {
 window.gotchaLocationToken = getToken;
 window.gotchaIsNative = () => !!window.Capacitor?.isNativePlatform?.();
 const GOTCHA_SERVER_URL = 'https://gottcha-oliver.onrender.com';
-window.gotchaServerUrl = () => (window.gotchaIsNative() || window.location.hostname.endsWith('.pages.dev')) ? GOTCHA_SERVER_URL : window.location.origin;
+window.gotchaServerUrl = () => (window.gotchaIsNative() || window.location.hostname.endsWith('.pages.dev') || window.location.hostname.endsWith('.vercel.app')) ? GOTCHA_SERVER_URL : window.location.origin;
 window.gotchaCurrentPosition = async () => {
   await Geolocation.requestPermissions();
   return Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 });

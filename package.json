@@ -1,0 +1,8 @@
+{
+  "name": "gotcha-live",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Real-time GPS hide-and-seek web app prototype",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=20" }
+}

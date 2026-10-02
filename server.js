@@ -124,11 +124,11 @@ function handle(peer, raw) {
   if (msg.locationToken) peer.locationToken = validLocationToken(msg.locationToken);
   if (msg.type === 'create') {
     if (peer.roomCode) return replyError(peer, 'Du bist bereits in einer Runde.');
-    const name = safeName(msg.name), point = validPoint(msg.point);
+    const name = safeName(msg.name), point = validPoint(msg.point), center = validPoint(msg.center) || point;
     if (!name || !point) return replyError(peer, 'Name und Standortfreigabe sind erforderlich.');
     const s = msg.settings || {};
     let code; do { code = String(crypto.randomInt(100000, 1000000)); } while (rooms.has(code));
-    const room = { code, hostId: null, center: { lat: point.lat, lng: point.lng }, startedAt: null, createdAt: Date.now(), settings: {
+    const room = { code, hostId: null, center: { lat: center.lat, lng: center.lng }, startedAt: null, createdAt: Date.now(), settings: {
       duration: Math.max(10, Math.min(60, Number(s.duration) || 30)),
       mode: s.mode === 'normal' ? 'normal' : 'shrink',
       zoneRadius: Math.max(100, Math.min(5000, Number(s.zoneRadius) || 800)),

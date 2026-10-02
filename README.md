@@ -11,7 +11,7 @@ npm install
 npm start
 ```
 
-Öffne anschließend `http://localhost:3000`. GPS ist auf `localhost` für Entwicklung erlaubt. Für andere Geräte oder Freunde braucht die App eine öffentlich erreichbare HTTPS-Adresse; dadurch verwendet sie automatisch WebSockets über `wss://`. Die Web-Version sendet im Vordergrund. Für Standortfreigabe im Hintergrund muss die native iOS- oder Android-App installiert sein.
+Öffne anschließend `http://localhost:3000`. GPS ist auf `localhost` für Entwicklung erlaubt. Für andere Geräte oder Freunde braucht die App eine öffentlich erreichbare HTTPS-Adresse; dadurch verwendet sie automatisch WebSockets über `wss://`. Die Web-Version sendet im Vordergrund. Für Standortfreigabe im Hintergrund muss die native iPhone-App installiert sein.
 
 ## iPhone-App
 
@@ -25,7 +25,7 @@ npm run cap:ios
 
 In `ios/App/App/Info.plist` sind die Begründungen für Standortzugriff im Vordergrund und Hintergrund sowie der Background Mode `location` bereits eingetragen. Öffne das Projekt auf einem Mac mit `npx cap open ios`, teste die Freigabe auf einem echten iPhone und erstelle dort den Installationsbuild. Für die Verteilung und TestFlight brauchst du Xcode auf macOS und Apples Entwicklerkonto.
 
-Das Betriebssystem kann die Erfassung weiterhin begrenzen: iOS stoppt Standortupdates, wenn die Person die App ausdrücklich beendet; Android kann sie bei aggressivem Energiesparen drosseln. Es wird nur so lange gesendet, wie die Einwilligung aktiv ist und der Standortzugriff erlaubt bleibt.
+Das Betriebssystem kann die Erfassung begrenzen: iOS stoppt Standortupdates, wenn die Person die App ausdrücklich beendet. Es wird nur so lange gesendet, wie die Einwilligung aktiv ist und der Standortzugriff erlaubt bleibt.
 
 ## So funktioniert eine Runde
 

@@ -13,7 +13,8 @@ const getToken = () => {
 
 window.gotchaLocationToken = getToken;
 window.gotchaIsNative = () => !!window.Capacitor?.isNativePlatform?.();
-window.gotchaServerUrl = () => window.gotchaIsNative() ? 'https://gottcha-oliver.onrender.com' : window.location.origin;
+const GOTCHA_SERVER_URL = 'https://gottcha-oliver.onrender.com';
+window.gotchaServerUrl = () => (window.gotchaIsNative() || window.location.hostname.endsWith('.pages.dev')) ? GOTCHA_SERVER_URL : window.location.origin;
 window.gotchaCurrentPosition = async () => {
   await Geolocation.requestPermissions();
   return Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 });

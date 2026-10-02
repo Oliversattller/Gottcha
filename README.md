@@ -1,16 +1,31 @@
-# Gottcha
+# Gotcha Live
 
 Ein spielbarer Mehrspieler-Prototyp für GPS-Verstecken. Frontend und Echtzeit-Server laufen im selben Node-Prozess; es werden keine npm-Pakete benötigt.
 
 ## Lokal starten
 
-Voraussetzung: Node.js 20 oder neuer.
+Voraussetzung: Node.js 22 oder neuer.
 
 ```sh
+npm install
 npm start
 ```
 
-Öffne anschließend `http://localhost:3000`. GPS ist auf `localhost` für Entwicklung erlaubt. Für andere Geräte oder Freunde braucht die App eine öffentlich erreichbare HTTPS-Adresse; dadurch verwendet sie automatisch WebSockets über `wss://`. Die Web-App lässt sich am iPhone über Safari zum Home-Bildschirm hinzufügen und auf Android über das Browsermenü installieren. Standort und GPS-Live-Updates funktionieren nur, solange das Gerät die Website aktiv ausführt; Hintergrundbetrieb ist keine native App-Funktion.
+Öffne anschließend `http://localhost:3000`. GPS ist auf `localhost` für Entwicklung erlaubt. Für andere Geräte oder Freunde braucht die App eine öffentlich erreichbare HTTPS-Adresse; dadurch verwendet sie automatisch WebSockets über `wss://`. Die Web-Version sendet im Vordergrund. Für Standortfreigabe im Hintergrund muss die native iOS- oder Android-App installiert sein.
+
+## iPhone-App
+
+Capacitor verpackt die Web-Oberfläche als iPhone-App. Die native Hintergrund-Ortung nutzt `@capgo/background-geolocation`; sie sendet Koordinaten direkt per HTTPS an den Server, auch wenn die WebView pausiert. In der App gibt es eine Schaltfläche zum Stoppen.
+
+```sh
+npm install
+npm run cap:sync
+npm run cap:ios
+```
+
+In `ios/App/App/Info.plist` sind die Begründungen für Standortzugriff im Vordergrund und Hintergrund sowie der Background Mode `location` bereits eingetragen. Öffne das Projekt auf einem Mac mit `npx cap open ios`, teste die Freigabe auf einem echten iPhone und erstelle dort den Installationsbuild. Für die Verteilung und TestFlight brauchst du Xcode auf macOS und Apples Entwicklerkonto.
+
+Das Betriebssystem kann die Erfassung weiterhin begrenzen: iOS stoppt Standortupdates, wenn die Person die App ausdrücklich beendet; Android kann sie bei aggressivem Energiesparen drosseln. Es wird nur so lange gesendet, wie die Einwilligung aktiv ist und der Standortzugriff erlaubt bleibt.
 
 ## So funktioniert eine Runde
 
@@ -45,10 +60,10 @@ Die Karte nutzt Leaflet und sichtbare OpenStreetMap-Kacheln mit Quellenangabe. D
 ## Datenschutz und Grenzen
 
 - Das Backend speichert Namen, Rollen und aktuelle Koordinaten nur im laufenden Prozessspeicher.
-- Koordinaten werden nach dem Beitritt zur Lobby und während der Runde an den Spielserver übertragen. Der Server gibt Suchern Hider-Positionen nur während eines Pings frei.
-- Wenn eine Runde endet, der Nutzer die Runde verlässt oder die Verbindung abbricht, stoppt der Browser die Standortfreigabe.
+- Nach deiner Zustimmung sendet die native App den aktuellen Standort fortlaufend, auch außerhalb einer Runde und im Hintergrund. Der Server hält nur den letzten Standort bis zum Stoppen oder bis zu 30 Minuten ohne neue Meldung flüchtig im Arbeitsspeicher. Sucher sehen Hider-Positionen weiterhin nur während eines Pings.
+- Beim Stoppen oder Widerrufen der Gerätefreigabe endet die Standortübertragung. Browser können Standortübertragung im Hintergrund pausieren; dafür ist die native App nötig.
 - Browser-GPS ist nicht fälschungssicher und kann je nach Gerät ungenau sein.
-- Der Prototyp enthält keine Konten, dauerhafte Spielhistorie, Push-Nachrichten oder native iOS/Android-Installationspakete.
+- Es gibt keine Konten und keine dauerhafte Spielhistorie. Das iPhone-Installationspaket muss mit Xcode gebaut und signiert werden.
 
 ## Kurztest
 

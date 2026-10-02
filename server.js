@@ -4,10 +4,12 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 
 const PORT = Number(process.env.PORT || 3000);
-const ROOT = path.join(__dirname, 'public');
+const ROOT = path.join(__dirname, 'dist');
+const DEV_ROOT = path.join(__dirname, 'public');
 const MAX_FRAME = 64 * 1024;
 const rooms = new Map();
 const peers = new Set();
+const locationClients = new Map();
 
 function sendFrame(socket, data, opcode = 1) {
   if (socket.destroyed) return;
@@ -29,6 +31,26 @@ function validPoint(point) {
   if (!point) return null;
   const lat = cleanCoord(point.lat, -90, 90), lng = cleanCoord(point.lng, -180, 180);
   return lat === null || lng === null ? null : { lat, lng, accuracy: Math.max(0, Math.min(1000, Number(point.accuracy) || 0)) };
+}
+function validLocationToken(value) { const token = String(value || ''); return /^[a-f0-9-]{36}$/i.test(token) ? token : null; }
+function bindLocationToken(peer, room, player) {
+  const token = validLocationToken(peer.locationToken);
+  if (!token) return;
+  peer.locationToken = token;
+  const record = locationClients.get(token) || { point: null, roomCode: null, playerId: null, updatedAt: Date.now() };
+  record.roomCode = room.code; record.playerId = player.id; record.updatedAt = Date.now();
+  if (player.point) record.point = player.point;
+  locationClients.set(token, record);
+}
+function updateLocationToken(token, point) {
+  const record = locationClients.get(token) || { point: null, roomCode: null, playerId: null };
+  record.point = point; record.updatedAt = Date.now(); locationClients.set(token, record);
+  const room = record.roomCode && rooms.get(record.roomCode), player = room && room.players.get(record.playerId);
+  if (player) {
+    player.point = point; player.online = true; player.lastLocation = Date.now();
+    if (room.startedAt) { tryAutoCatch(room, player); updatePresence(room, player); }
+    broadcast(room);
+  }
 }
 function meters(a, b) {
   const rad = n => n * Math.PI / 180, R = 6371000;
@@ -99,6 +121,7 @@ function handle(peer, raw) {
   let msg;
   try { msg = JSON.parse(raw); } catch { return replyError(peer, 'Ungültige Nachricht.'); }
   if (!msg || typeof msg.type !== 'string') return replyError(peer, 'Ungültige Aktion.');
+  if (msg.locationToken) peer.locationToken = validLocationToken(msg.locationToken);
   if (msg.type === 'create') {
     if (peer.roomCode) return replyError(peer, 'Du bist bereits in einer Runde.');
     const name = safeName(msg.name), point = validPoint(msg.point);
@@ -118,6 +141,7 @@ function handle(peer, raw) {
     rooms.set(code, room);
     const player = { id: peer.playerId, name, icon: String(msg.icon || '🦊').slice(0,8), role: 'Sucher', point, online: true, ready: true, caught: false, caughtReason: null, outsideSince: null };
     peer.roomCode = code; peer.icon = player.icon; room.players.set(player.id, player);
+    bindLocationToken(peer, room, player);
     send(peer, { type: 'joined', playerId: player.id, code }); broadcast(room); return;
   }
   if (msg.type === 'join') {
@@ -127,17 +151,36 @@ function handle(peer, raw) {
     if (room.startedAt) return replyError(peer, 'Diese Runde läuft bereits.');
     if (!name || !point) return replyError(peer, 'Name und Standortfreigabe sind erforderlich.');
     if (room.players.size >= 20) return replyError(peer, 'Die Lobby ist voll (maximal 20 Spieler).');
-    addPlayer(peer, room, name, point, 'Versteckter'); broadcast(room); return;
+    addPlayer(peer, room, name, point, 'Versteckter');
+    bindLocationToken(peer, room, room.players.get(peer.playerId));
+    broadcast(room); return;
   }
   const room = rooms.get(peer.roomCode), player = room && room.players.get(peer.playerId);
-  if (!room || !player) return replyError(peer, 'Tritt zuerst einer Runde bei.');
-  if (room.startedAt && !room.ended && Date.now() >= room.startedAt + room.settings.duration * 60 * 1000) { room.ended = true; broadcast(room); }
+  if (msg.type === 'leaveRoom') {
+    if (player) { player.online = false; broadcast(room); }
+    const entry = peer.locationToken && locationClients.get(peer.locationToken);
+    if (entry) { entry.roomCode = null; entry.playerId = null; entry.updatedAt = Date.now(); }
+    peer.roomCode = null; peer.playerId = null; return;
+  }
   if (msg.type === 'location') {
     const point = validPoint(msg.point); if (!point) return;
+    peer.point = point;
+    const token = validLocationToken(msg.locationToken || peer.locationToken);
+    if (token) { peer.locationToken = token; updateLocationToken(token, point); if (player) return; }
+    if (!player) return;
     player.point = point; player.online = true; player.lastLocation = Date.now();
     if (room.startedAt) { tryAutoCatch(room, player); updatePresence(room, player); }
     broadcast(room); return;
   }
+  if (msg.type === 'stopLocation') {
+    peer.point = null;
+    const token = validLocationToken(msg.locationToken || peer.locationToken);
+    if (token) locationClients.delete(token);
+    if (player) { player.point = null; player.online = false; broadcast(room); }
+    return;
+  }
+  if (!room || !player) return replyError(peer, 'Tritt zuerst einer Runde bei.');
+  if (room.startedAt && !room.ended && Date.now() >= room.startedAt + room.settings.duration * 60 * 1000) { room.ended = true; broadcast(room); }
   if (msg.type === 'role') {
     if (room.startedAt) return replyError(peer, 'Rollen können nach dem Start nicht geändert werden.');
     const next = msg.role === 'Sucher' ? 'Sucher' : 'Versteckter';
@@ -165,11 +208,50 @@ function handle(peer, raw) {
   if (msg.type === 'leave') { closeConnection(peer); try { peer.socket.close(); } catch {} }
 }
 
+function clearLocationToken(token) {
+  const entry = locationClients.get(token);
+  if (entry) {
+    const room = entry.roomCode && rooms.get(entry.roomCode), player = room && room.players.get(entry.playerId);
+    if (player) { player.point = null; player.online = false; broadcast(room); }
+    locationClients.delete(token);
+  }
+}
+function locationApi(req, res) {
+  const sendJson = (status, value) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(value)); };
+  const origin = req.headers.origin;
+  const allowedOrigins = new Set([process.env.APP_ORIGIN, process.env.RENDER_EXTERNAL_URL, 'capacitor://localhost', 'http://localhost'].filter(Boolean));
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader('access-control-allow-origin', origin);
+    res.setHeader('vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') {
+    if (!origin || !allowedOrigins.has(origin)) return sendJson(403, { error: 'Origin not allowed' });
+    res.setHeader('access-control-allow-methods', 'POST, DELETE, OPTIONS');
+    res.setHeader('access-control-allow-headers', 'Authorization, Content-Type');
+    return sendJson(204, {});
+  }
+  if (origin && !allowedOrigins.has(origin)) return sendJson(403, { error: 'Origin not allowed' });
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (!validLocationToken(token)) return sendJson(401, { error: 'Invalid location token' });
+  if (req.method === 'DELETE') { clearLocationToken(token); return sendJson(200, { ok: true }); }
+  if (req.method !== 'POST') { res.setHeader('Allow', 'POST, DELETE'); return sendJson(405, { error: 'Method not allowed' }); }
+  let body = '';
+  req.on('data', chunk => { body += chunk; if (body.length > 8192) req.destroy(); });
+  req.on('end', () => {
+    let value; try { value = JSON.parse(body); } catch { return sendJson(400, { error: 'Invalid JSON' }); }
+    const point = validPoint({ lat: value.latitude ?? value.lat, lng: value.longitude ?? value.lng, accuracy: value.accuracy });
+    if (!point) return sendJson(400, { error: 'Invalid location' });
+    updateLocationToken(token, point);
+    sendJson(200, { ok: true });
+  });
+}
 function staticFile(req, res) {
+  if (req.url === '/api/location') return locationApi(req, res);
   if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, rooms: rooms.size })); }
   const pathname = decodeURIComponent((req.url || '/').split('?')[0]);
-  const target = path.resolve(ROOT, pathname === '/' ? 'index.html' : '.' + pathname);
-  if (!target.startsWith(ROOT + path.sep) && target !== path.join(ROOT, 'index.html')) { res.writeHead(403); return res.end('Forbidden'); }
+  const root = fs.existsSync(path.join(ROOT, 'index.html')) ? ROOT : DEV_ROOT;
+  const target = path.resolve(root, pathname === '/' ? 'index.html' : '.' + pathname);
+  if (!target.startsWith(root + path.sep) && target !== path.join(root, 'index.html')) { res.writeHead(403); return res.end('Forbidden'); }
   fs.readFile(target, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
     const ext = path.extname(target);
@@ -181,7 +263,9 @@ const server = http.createServer(staticFile);
 server.on('upgrade', (req, socket) => {
   if (req.url !== '/ws' || !req.headers['sec-websocket-key']) { socket.destroy(); return; }
   const expectedOrigin = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL;
-  if ((process.env.NODE_ENV === 'production' && (!expectedOrigin || req.headers.origin !== expectedOrigin)) || (expectedOrigin && req.headers.origin !== expectedOrigin)) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
+  const origin = req.headers.origin;
+  const allowedOrigins = new Set([expectedOrigin, 'capacitor://localhost', 'http://localhost'].filter(Boolean));
+  if ((process.env.NODE_ENV === 'production' && !expectedOrigin) || (origin && !allowedOrigins.has(origin)) || (!origin && process.env.NODE_ENV === 'production')) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
   const accept = crypto.createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
   const peer = { socket, roomCode: null, playerId: null, buffer: Buffer.alloc(0), closed: false }; peers.add(peer);
@@ -206,6 +290,7 @@ server.on('upgrade', (req, socket) => {
 });
 setInterval(() => {
   const now = Date.now();
+  for (const [token, entry] of locationClients) if (now - entry.updatedAt > 30 * 60 * 1000) clearLocationToken(token);
   for (const [code, room] of rooms) {
     if (room.startedAt && !room.ended && now >= room.startedAt + room.settings.duration * 60 * 1000) { room.ended = true; broadcast(room); }
     if (room.startedAt && !room.ended && room.nextPingAt && now >= room.nextPingAt) { room.revealUntil = now + 8000; room.nextPingAt = now + room.settings.pingInterval * 60 * 1000; broadcast(room); }

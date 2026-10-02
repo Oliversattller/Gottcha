@@ -1,0 +1,54 @@
+name: iOS build check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - "public/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.json"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Sync Capacitor iOS project
+        run: npx cap sync ios
+      - name: Build for iPhone simulator
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Package simulator app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/Build/Products/Debug-iphonesimulator/App.app \
+            Gotcha-iOS-Simulator.zip
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gotcha-iOS-Simulator
+          path: Gotcha-iOS-Simulator.zip
+          retention-days: 14

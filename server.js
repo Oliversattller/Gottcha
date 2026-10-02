@@ -264,7 +264,7 @@ server.on('upgrade', (req, socket) => {
   if (req.url !== '/ws' || !req.headers['sec-websocket-key']) { socket.destroy(); return; }
   const expectedOrigin = process.env.APP_ORIGIN || process.env.RENDER_EXTERNAL_URL;
   const origin = req.headers.origin;
-  const allowedOrigins = new Set([expectedOrigin, 'capacitor://localhost', 'http://localhost'].filter(Boolean));
+  const allowedOrigins = new Set([process.env.APP_ORIGIN, process.env.RENDER_EXTERNAL_URL, 'capacitor://localhost', 'http://localhost'].filter(Boolean));
   if ((process.env.NODE_ENV === 'production' && !expectedOrigin) || (origin && !allowedOrigins.has(origin)) || (!origin && process.env.NODE_ENV === 'production')) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
   const accept = crypto.createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');

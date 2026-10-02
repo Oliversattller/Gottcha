@@ -45,7 +45,7 @@ Die Karte nutzt Leaflet und sichtbare OpenStreetMap-Kacheln mit Quellenangabe. D
 ## Datenschutz und Grenzen
 
 - Das Backend speichert Namen, Rollen und aktuelle Koordinaten nur im laufenden Prozessspeicher.
-- Koordinaten werden während der Runde an den Spielserver übertragen. Der Server gibt Suchern Hider-Positionen nur während eines Pings frei.
+- Koordinaten werden nach dem Beitritt zur Lobby und während der Runde an den Spielserver übertragen. Der Server gibt Suchern Hider-Positionen nur während eines Pings frei.
 - Wenn eine Runde endet, der Nutzer die Runde verlässt oder die Verbindung abbricht, stoppt der Browser die Standortfreigabe.
 - Browser-GPS ist nicht fälschungssicher und kann je nach Gerät ungenau sein.
 - Der Prototyp enthält keine Konten, dauerhafte Spielhistorie, Push-Nachrichten oder native iOS/Android-Installationspakete.

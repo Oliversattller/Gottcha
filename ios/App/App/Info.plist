@@ -5,7 +5,7 @@
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>Gotcha verwendet deinen Standort, um dich auf der Spielkarte anzuzeigen und Runden mit echtem GPS zu spielen.</string>
   <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-  <string>Wenn du die Standortfreigabe einschaltest, sendet Gotcha deinen Standort auch bei gesperrtem Bildschirm, damit eine laufende Runde weiter funktioniert. Du kannst die Übertragung jederzeit in der App stoppen.</string>
+  <string>Wenn du die Standortfreigabe einschaltest, sendet Gotcha deinen aktuellen Standort fortlaufend an den Spielserver, auch außerhalb einer Runde und bei gesperrtem Bildschirm. Du kannst die Übertragung jederzeit in der App stoppen.</string>
   <key>UIBackgroundModes</key>
   <array>
     <string>location</string>
